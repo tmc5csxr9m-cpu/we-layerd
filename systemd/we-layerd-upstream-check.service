@@ -1,0 +1,19 @@
+[Unit]
+Description=Check we-layerd upstream repositories for new commits
+Documentation=https://github.com/tmc5csxr9m-cpu/we-layerd
+After=graphical-session.target
+PartOf=graphical-session.target
+StartLimitIntervalSec=180s
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/we-layerd/upstream-check.env
+ExecStart=%h/.local/bin/we-layerd-check-upstream
+TimeoutStartSec=60s
+NoNewPrivileges=yes
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=graphical-session.target

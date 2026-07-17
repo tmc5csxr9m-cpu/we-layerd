@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+readonly state_root="${XDG_STATE_HOME:-${HOME:-}/.local/state}/we-layerd"
+readonly state_file="${state_root}/upstream-heads"
+readonly lock_file="${state_root}/upstream-check.lock"
+
+readonly sources=(
+    "we-layerd|main|https://github.com/Aromatic05/we-layerd.git"
+    "wallpaper-engine-renderer|master|https://github.com/Aromatic05/wallpaper-engine-renderer.git"
+)
+
+initialize=false
+case "${1:-}" in
+    "") ;;
+    --initialize) initialize=true ;;
+    *)
+        printf 'usage: %s [--initialize]\n' "$0" >&2
+        exit 2
+        ;;
+esac
+
+if [[ -z "${HOME:-}" ]]; then
+    printf 'HOME is unavailable; skipping upstream check\n' >&2
+    exit 0
+fi
+
+umask 077
+mkdir -p "$state_root"
+exec 9>"$lock_file"
+if ! flock -n 9; then
+    printf 'another upstream check is already running\n' >&2
+    exit 0
+fi
+
+declare -A previous_heads=()
+if [[ -f "$state_file" ]]; then
+    while IFS=$'\t' read -r name branch revision; do
+        if [[ -n "$name" && -n "$branch" && "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+            previous_heads["${name}|${branch}"]="$revision"
+        fi
+    done <"$state_file"
+fi
+
+resolve_head() {
+    local remote_url=$1
+    local branch=$2
+    local attempt output revision
+
+    for attempt in 1 2 3; do
+        output=$(timeout 6s git ls-remote --exit-code "$remote_url" "refs/heads/${branch}" 2>/dev/null) || true
+        revision=${output%%[[:space:]]*}
+        if [[ "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+            printf '%s\n' "$revision"
+            return 0
+        fi
+        if (( attempt < 3 )); then
+            sleep "$attempt"
+        fi
+    done
+    return 1
+}
+
+declare -a current_records=()
+notification_body=""
+changed=false
+query_failed=false
+
+for source in "${sources[@]}"; do
+    IFS='|' read -r name branch remote_url <<<"$source"
+    key="${name}|${branch}"
+    previous=${previous_heads[$key]:-}
+
+    if ! current=$(resolve_head "$remote_url" "$branch"); then
+        printf 'unable to query %s/%s after bounded retries\n' "$name" "$branch" >&2
+        query_failed=true
+        if [[ -n "$previous" ]]; then
+            current_records+=("${name}"$'\t'"${branch}"$'\t'"${previous}")
+        fi
+        continue
+    fi
+
+    current_records+=("${name}"$'\t'"${branch}"$'\t'"${current}")
+    if [[ -n "$previous" && "$current" != "$previous" ]]; then
+        changed=true
+        notification_body+="${name}/${branch}: ${previous:0:7} → ${current:0:7}"$'\n'
+    fi
+done
+
+write_state() {
+    local temporary
+    temporary=$(mktemp "${state_file}.XXXXXX") || return 1
+    printf '%s\n' "${current_records[@]}" >"$temporary"
+    mv -f "$temporary" "$state_file"
+}
+
+if $initialize; then
+    write_state || {
+        printf 'failed to initialize upstream state\n' >&2
+        exit 1
+    }
+    if $query_failed; then
+        exit 1
+    fi
+    printf 'initialized upstream heads in %s\n' "$state_file"
+    exit 0
+fi
+
+if $changed; then
+    notification_body=${notification_body%$'\n'}
+    if ! notify-send \
+        --app-name='we-layerd' \
+        --icon='software-update-available' \
+        --urgency='normal' \
+        'we-layerd 上游有新提交' \
+        "$notification_body"; then
+        printf 'desktop notification service is unavailable; keeping previous state for the next boot\n' >&2
+        exit 0
+    fi
+fi
+
+write_state || {
+    printf 'failed to update upstream state\n' >&2
+    exit 1
+}
+
+if $query_failed; then
+    exit 1
+fi
