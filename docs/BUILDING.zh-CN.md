@@ -82,10 +82,10 @@ CEF 和 DXC 的版本、下载地址及 SHA-256 位于 `package/common/versions.
 
 ```bash
 sudo dnf install \
-  gcc-c++ cmake pkgconf-pkg-config git curl ca-certificates \
+  gcc-c++ clang-devel cmake pkgconf-pkg-config git curl ca-certificates \
   rust cargo \
   wayland-devel wayland-protocols-devel libxkbcommon-devel \
-  gtk3-devel \
+  gtk3-devel pipewire-devel \
   lz4-devel pango-devel fontconfig-devel freetype-devel \
   vulkan-loader-devel vulkan-headers mesa-libGL-devel \
   libatomic libdrm-devel libva-devel \
@@ -150,7 +150,7 @@ sudo apt install \
   build-essential cmake pkg-config git curl ca-certificates \
   rustc cargo \
   libwayland-dev wayland-protocols libxkbcommon-dev \
-  libgtk-3-dev \
+  libgtk-3-dev libpipewire-0.3-dev libclang-dev \
   liblz4-dev libpango1.0-dev libfontconfig1-dev libfreetype-dev \
   libvulkan-dev libgl-dev \
   libdrm-dev libva-dev \
@@ -223,6 +223,7 @@ Ubuntu 24.04 可以安装系统原生 C/C++ 依赖，但 Rust 必须通过 rustu
 ```bash
 sudo apt install curl build-essential cmake pkg-config git \
   libwayland-dev wayland-protocols libxkbcommon-dev libgtk-3-dev \
+  libpipewire-0.3-dev libclang-dev \
   liblz4-dev libpango1.0-dev libfontconfig1-dev libfreetype-dev \
   libvulkan-dev libgl-dev libdrm-dev libva-dev \
   libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \

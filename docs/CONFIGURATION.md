@@ -26,6 +26,7 @@ assets_path = "/path/to/Steam/steamapps/common/wallpaper_engine/assets"
 ```toml
 [general]
 interactive = true
+global_pointer_tracking = false
 show_fps = false
 fps_report_interval_secs = 1
 scale_mode = "cover"
@@ -34,6 +35,7 @@ force_scene_audio_loop = false
 
 - backend selection is automatic: GNOME sessions use the GNOME actor-clone path; other desktops use layer-shell
 - `interactive`: when `false`, `we-layerd` sets an empty input region so the wallpaper does not consume pointer input
+- `global_pointer_tracking`: layer-shell only, disabled by default. When enabled with `interactive = true`, the next wallpaper start or switch opens the system ScreenCast chooser and asks the user to approve exactly one monitor. Motion from that monitor is used when cursor metadata becomes available; cancellation, denial, missing metadata, or a stream error falls back to surface-local motion without failing the daemon.
 - `show_fps`: keeps the renderer FPS counters enabled in config/status
 - `force_scene_audio_loop`: opt-in override that loops visible, automatically started scene sounds authored as `single`; start-silent sounds and `random` playback are unchanged. The daemon merges this value into `scene.audio.forceLoop` without replacing other version-1 source options.
 - `scale_mode`: `fit`, `cover`, or `stretch`
@@ -41,6 +43,12 @@ force_scene_audio_loop = false
   - `cover`: fill the logical surface and crop the source region when buffer and viewport aspects differ
   - `fit`: preserve aspect ratio and shrink the viewport destination when needed
   - current `fit` limitation: the runtime uses one layer-surface plus `wp_viewporter`, so any empty area stays on the bottom/right edges instead of being centered like a full letterbox compositor scene
+
+### Optional global pointer privacy and permissions
+
+The ScreenCast portal grants access only after its own user-facing chooser. `we-layerd` requests `CursorMode::Metadata`, monitor sources only, one selection, and `PersistMode::DoNot`; it does not request root access, input-device access, or a persistent grant. The portal and compositor still produce a video stream as part of the protocol. `we-layerd` connects to that portal-scoped PipeWire stream without `MAP_BUFFERS`, reads only `MetaCursor`, and never maps, reads, copies, or saves image planes. Buttons, wheel input, focus, and release ordering continue to come from the layer surface; only pointer motion is replaced while metadata is active.
+
+Runtime state is visible in `we-layerd ctl status` as `global_pointer_tracking_configured`, `global_pointer_tracking_active`, and `global_pointer_tracking_error`.
 
 ## Renderer settings
 

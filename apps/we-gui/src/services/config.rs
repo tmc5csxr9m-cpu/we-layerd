@@ -3,7 +3,8 @@ use std::path::Path;
 use we_core::{
     config::{
         build_config_for_wallpaper, save_config, save_force_scene_audio_loop,
-        save_integrations_and_rules, save_playlists_profiles_and_outputs,
+        save_global_pointer_tracking, save_integrations_and_rules,
+        save_playlists_profiles_and_outputs,
         save_profiles_and_outputs, save_wallpapers, save_wallpapers_playlists_profiles_and_outputs,
         IntegrationsConfig, LaunchSettings, OutputBinding, RuntimeRulesConfig,
     },
@@ -83,4 +84,11 @@ pub(crate) fn persist_wallpapers_playlists_profiles_and_outputs(
         outputs,
     )
     .map_err(|error| error.to_string())
+}
+
+pub(crate) fn persist_global_pointer_tracking(
+    config_path: &Path,
+    enabled: bool,
+) -> Result<(), String> {
+    save_global_pointer_tracking(config_path, enabled).map_err(|error| error.to_string())
 }

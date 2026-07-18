@@ -48,6 +48,7 @@ It supports compositors implementing the layer-shell protocol, including niri, H
 - Can follow the output resolution or use a fixed rendering resolution.
 - Supports cover, fit, stretch, and center scaling modes, plus 0°, 90°, 180°, and 270° rotation.
 - Forwards pointer movement, clicks, and scrolling to interactive wallpapers.
+- Optionally tracks pointer motion across one user-approved monitor through the system ScreenCast portal.
 - Includes an optional compatibility setting for looping visible scene audio authored as a one-shot sound.
 
 ### Wayland-native rendering
@@ -85,6 +86,7 @@ The GUI detects common Steam paths, opens the Workshop library, saves wallpaper 
 - A compositor with layer-shell support, or GNOME with the bundled extension enabled.
 - A local Wallpaper Engine installation and downloaded Workshop wallpapers.
 - Linux x86_64 for the current CEF-based web wallpaper helper.
+- Optional global pointer tracking requires `xdg-desktop-portal` and a ScreenCast-capable portal backend.
 
 ## Documentation
 

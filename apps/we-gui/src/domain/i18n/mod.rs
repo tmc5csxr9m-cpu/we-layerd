@@ -236,6 +236,16 @@ pub(crate) enum Text {
     RuleMute,
     RulePause,
     IntegrationRuntimeStatus,
+    TrackPointerAcrossDesktop,
+    TrackPointerAcrossDesktopDescription,
+    #[allow(dead_code)]
+    PortalAuthorization,
+    #[allow(dead_code)]
+    PortalAuthorizationDescription,
+    #[allow(dead_code)]
+    PortalAuthorizationFallback,
+    #[allow(dead_code)]
+    PortalAuthorizationCancelled,
     ShowRealtimeFps,
     PreferDmabuf,
     AllowShmFallback,
@@ -353,6 +363,9 @@ mod tests {
     #[test]
     fn primary_ui_copy_exists_in_both_catalogs() {
         for language in Language::ALL {
+            assert!(!language.text(Text::TrackPointerAcrossDesktop).is_empty());
+            assert!(!language.text(Text::TrackPointerAcrossDesktopDescription).is_empty());
+            assert!(!language.text(Text::PortalAuthorizationCancelled).is_empty());
             assert!(!language.text(Text::ApplyToDisplays).is_empty());
             assert!(!language.text(Text::NoWaylandDisplaysDetected).is_empty());
             assert!(!language.text(Text::RuntimeStatus).is_empty());

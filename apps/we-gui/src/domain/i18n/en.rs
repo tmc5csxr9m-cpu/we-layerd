@@ -91,6 +91,20 @@ pub(super) fn text(key: Text) -> &'static str {
         Text::RuleMute => "Mute wallpaper",
         Text::RulePause => "Pause wallpaper",
         Text::IntegrationRuntimeStatus => "Integration runtime status",
+        Text::TrackPointerAcrossDesktop => "Track pointer across the desktop",
+        Text::TrackPointerAcrossDesktopDescription => {
+            "On layer-shell, the next wallpaper start or switch asks you to choose one monitor through the system ScreenCast portal. The portal and compositor still produce a video stream; we-layerd reads only cursor metadata and does not map, read, or save image data."
+        }
+        Text::PortalAuthorization => "Portal authorization",
+        Text::PortalAuthorizationDescription => {
+            "Choose one monitor in the system authorization picker to allow cursor-metadata tracking."
+        }
+        Text::PortalAuthorizationFallback => {
+            "Portal tracking is unavailable; using surface-local pointer input."
+        }
+        Text::PortalAuthorizationCancelled => {
+            "Portal authorization was cancelled; using surface-local pointer input."
+        }
         Text::ShowRealtimeFps => "Show realtime FPS",
         Text::PreferDmabuf => "Prefer DMA-BUF presentation",
         Text::AllowShmFallback => "Allow SHM fallback",

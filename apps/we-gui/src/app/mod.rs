@@ -63,6 +63,7 @@ mod tests {
             allow_shm_fallback: true,
             interactive: false,
             force_scene_audio_loop: true,
+            global_pointer_tracking: true,
             fps_limit: "144".to_string(),
             show_fps: true,
             scale_mode: ScaleModeOption::Stretch,
@@ -100,6 +101,7 @@ mod tests {
         assert!(launch_settings.allow_shm_fallback);
         assert!(!launch_settings.interactive);
         assert!(launch_settings.force_scene_audio_loop);
+        assert!(launch_settings.global_pointer_tracking);
         assert_eq!(launch_settings.scale_mode, ScaleMode::Stretch);
     }
 

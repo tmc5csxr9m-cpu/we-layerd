@@ -17,6 +17,7 @@ ExclusiveArch:  x86_64
 BuildRequires:  binutils
 BuildRequires:  cargo
 BuildRequires:  cef-devel
+BuildRequires:  clang-devel
 BuildRequires:  cmake
 BuildRequires:  desktop-file-utils
 BuildRequires:  fontconfig-devel
@@ -35,6 +36,7 @@ BuildRequires:  lz4-devel
 BuildRequires:  mesa-libGL-devel
 BuildRequires:  pango-devel
 BuildRequires:  patchelf
+BuildRequires:  pipewire-devel
 BuildRequires:  pkgconf-pkg-config
 BuildRequires:  rust
 BuildRequires:  vulkan-headers
@@ -50,12 +52,14 @@ Requires:       gstreamer1-plugins-base
 Requires:       gstreamer1-plugins-good
 Requires:       xdotool
 Suggests:       gnome-shell
+Recommends:     pipewire
+Recommends:     xdg-desktop-portal
 
 %description
 we-layerd runs Wallpaper Engine wallpapers through a native renderer on
 Wayland. It supports layer-shell compositors and GNOME, DMA-BUF and SHM
 presentation, interactive pointer input, video wallpapers, web wallpapers,
-and a companion GUI.
+optional portal-approved global pointer motion, and a companion GUI.
 
 The project source currently has no published license. This spec is intended
 for local package builds until the project adopts a distributable license.

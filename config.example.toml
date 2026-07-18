@@ -1,5 +1,6 @@
 [general]
 interactive = true
+global_pointer_tracking = false
 show_fps = false
 fps_report_interval_secs = 1
 scale_mode = "cover"

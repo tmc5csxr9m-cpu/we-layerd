@@ -151,6 +151,17 @@ pub fn build_settings_overlay<'a>(
         .id("settings.audio.force-loop"),
         text(language.text(Text::ForceSceneAudioLoopDescription)).size(12),
         container(
+            column![
+                checkbox(ui_settings.global_pointer_tracking)
+                    .label(language.text(Text::TrackPointerAcrossDesktop))
+                    .on_toggle(Message::GlobalPointerTrackingToggled)
+                    .style(md_checkbox_style),
+                text(language.text(Text::TrackPointerAcrossDesktopDescription)).size(12),
+            ]
+            .spacing(4),
+        )
+        .id("settings.global-pointer-tracking"),
+        container(
             checkbox(ui_settings.show_fps)
                 .label(language.text(Text::ShowRealtimeFps))
                 .on_toggle(Message::ShowFpsToggled)

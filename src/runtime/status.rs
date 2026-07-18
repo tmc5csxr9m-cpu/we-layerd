@@ -39,6 +39,9 @@ pub(crate) struct RuntimeDiagnostics {
     pub(crate) prefer_dmabuf_effective: bool,
     pub(crate) allow_shm_fallback: bool,
     pub(crate) nvidia_prime_offload_detected: bool,
+    pub(crate) global_pointer_tracking_configured: bool,
+    pub(crate) global_pointer_tracking_active: bool,
+    pub(crate) global_pointer_tracking_error: Option<String>,
     pub(crate) options_json: OptionsJsonDiagnostics,
     pub(crate) media_integration_supported: bool,
     pub(crate) audio_integration_supported: bool,
@@ -160,6 +163,18 @@ impl RuntimeStatusSnapshot {
             format!(
                 "nvidia_prime_offload_detected = {}",
                 self.runtime.nvidia_prime_offload_detected
+            ),
+            format!(
+                "global_pointer_tracking_configured = {}",
+                self.runtime.global_pointer_tracking_configured
+            ),
+            format!(
+                "global_pointer_tracking_active = {}",
+                self.runtime.global_pointer_tracking_active
+            ),
+            format!(
+                "global_pointer_tracking_error = {:?}",
+                self.runtime.global_pointer_tracking_error.as_deref().unwrap_or("")
             ),
             format!("options_json_present = {}", self.runtime.options_json.present),
             format!("options_json_len = {}", self.runtime.options_json.len),

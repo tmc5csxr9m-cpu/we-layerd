@@ -162,6 +162,7 @@ pub(crate) enum Message {
     FpsLimitChanged(String),
     InteractiveToggled(bool),
     ForceSceneAudioLoopToggled(bool),
+    GlobalPointerTrackingToggled(bool),
     ShowFpsToggled(bool),
     ScaleModeSelected(ScaleModeOption),
     MediaIntegrationToggled(bool),

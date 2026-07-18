@@ -44,6 +44,8 @@ pub struct GeneralConfig {
     #[serde(default)]
     pub force_scene_audio_loop: bool,
     #[serde(default)]
+    pub global_pointer_tracking: bool,
+    #[serde(default)]
     pub show_fps: bool,
     #[serde(default = "default_fps_report_interval_secs")]
     pub fps_report_interval_secs: u64,
@@ -173,6 +175,7 @@ impl Default for GeneralConfig {
             backend: default_backend(),
             interactive: default_interactive(),
             force_scene_audio_loop: false,
+            global_pointer_tracking: false,
             show_fps: false,
             fps_report_interval_secs: default_fps_report_interval_secs(),
             scale_mode: ScaleMode::default(),
@@ -259,6 +262,7 @@ mod tests {
         assert_eq!(cfg.gnome.extension_dbus_name, "io.github.weLayerd.Gnome");
         assert!(cfg.general.interactive);
         assert!(!cfg.general.force_scene_audio_loop);
+        assert!(!cfg.general.global_pointer_tracking);
         assert_eq!(cfg.general.scale_mode, ScaleMode::Cover);
         assert!(cfg.renderer.library_path.is_empty());
         assert_eq!(cfg.renderer.fps, 60);
@@ -311,9 +315,12 @@ mod tests {
 
     #[test]
     fn config_accepts_layer_shell_backend() {
-        let cfg: Config = toml::from_str("[general]\nbackend = \"layer_shell\"\n")
+        let cfg: Config = toml::from_str(
+            "[general]\nbackend = \"layer_shell\"\nglobal_pointer_tracking = true\n",
+        )
             .expect("valid layer_shell backend");
         assert_eq!(cfg.general.backend, ConfigBackend::LayerShell);
+        assert!(cfg.general.global_pointer_tracking);
     }
 
     #[test]

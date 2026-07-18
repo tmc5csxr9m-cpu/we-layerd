@@ -46,6 +46,14 @@ third_party/wallpaper-engine-renderer
 - 确认壁纸本身支持交互
 - 多输出模式下，指针事件会转发给当前获得焦点的 layer surface 对应 session
 
+若要使用可选的跨桌面移动跟踪：
+
+- 同时设置 `general.interactive = true` 与 `general.global_pointer_tracking = true`，然后重新启动或切换壁纸
+- 安装并运行 `pipewire`、`xdg-desktop-portal` 和适用于当前桌面且支持 ScreenCast 的 portal 后端
+- 在系统选择器中明确批准一块显示器；取消或拒绝时会按设计保留 surface-local 输入
+- 在 `we-layerd ctl status` 中查看 `global_pointer_tracking_active` 和 `global_pointer_tracking_error`
+- portal 后端不提供 cursor metadata 时会安全回退；不要授予 root 或直接输入设备权限
+
 ## DMA-BUF 不工作
 
 - 保持 `renderer.prefer_dmabuf = true`

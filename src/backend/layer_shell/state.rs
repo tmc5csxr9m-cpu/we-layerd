@@ -25,7 +25,7 @@ use we_core::wallpaper::WallpaperType;
 use crate::{
     backend::wayland_common::{
         dmabuf::DmabufFeedbackState,
-        input::{PointerAxis, PointerInputState},
+        input::{map_surface_position, PointerAxis, PointerInputState},
         output::{OutputState, PresentationGeometry},
     },
     runtime::status::{FrameStats, RuntimeDiagnostics, RuntimeStatusSnapshot},
@@ -91,6 +91,7 @@ pub(crate) struct LayerShellState {
     pub(super) output: OutputState,
     pub(super) presentation_geometry: PresentationGeometry,
     pub(super) pointer_input: PointerInputState,
+    pub(super) global_pointer_active: bool,
     pub(super) last_input_region: Option<(u32, u32)>,
     pub(super) buffers: BufferBookkeeping,
     pub(super) frame_callback: FrameCallbackState,
@@ -175,6 +176,9 @@ impl LayerShellState {
     pub(super) fn pointer_entered(&mut self, surface_x: f64, surface_y: f64) {
         let events = self.pointer_input.enter(surface_x, surface_y, self.presentation_geometry);
         for event in events {
+            if self.global_pointer_active && matches!(event, we_renderer::InputEvent::PointerMove { .. }) {
+                continue;
+            }
             self.pending_input_events.push(event);
         }
     }
@@ -183,8 +187,41 @@ impl LayerShellState {
         if let Some(event) =
             self.pointer_input.move_to(surface_x, surface_y, self.presentation_geometry)
         {
-            self.pending_input_events.push(event);
+            if !self.global_pointer_active {
+                self.pending_input_events.push(event);
+            }
         }
+    }
+
+    pub(super) fn global_pointer_moved(&mut self, normalized_x: f64, normalized_y: f64) -> bool {
+        if !normalized_x.is_finite() || !normalized_y.is_finite() {
+            return false;
+        }
+        if self.output.logical_width == 0 || self.output.logical_height == 0 {
+            return false;
+        }
+
+        let surface_x = normalized_x.clamp(0.0, 1.0) * self.output.logical_width as f64;
+        let surface_y = normalized_y.clamp(0.0, 1.0) * self.output.logical_height as f64;
+        let Some((x, y)) = map_surface_position(
+            surface_x,
+            surface_y,
+            self.presentation_geometry,
+        ) else {
+            return false;
+        };
+
+        let activated = !self.global_pointer_active;
+        self.global_pointer_active = true;
+        self.diagnostics.global_pointer_tracking_active = true;
+        self.diagnostics.global_pointer_tracking_error = None;
+        self.pending_input_events.push(we_renderer::InputEvent::PointerMove { x, y });
+        activated
+    }
+
+    pub(super) fn disable_global_pointer(&mut self) -> bool {
+        self.diagnostics.global_pointer_tracking_active = false;
+        std::mem::take(&mut self.global_pointer_active)
     }
 
     pub(super) fn pointer_button(&mut self, linux_button: u32, pressed: bool) {
@@ -309,6 +346,7 @@ impl LayerShellState {
             output,
             presentation_geometry,
             pointer_input: PointerInputState::default(),
+            global_pointer_active: false,
             last_input_region: None,
             buffers: BufferBookkeeping::default(),
             frame_callback: FrameCallbackState::default(),
@@ -369,6 +407,47 @@ mod tests {
         assert_eq!(
             state.pending_input_events.drain(),
             vec![InputEvent::Focus { focused: true }, InputEvent::PointerMove { x: 0.25, y: 0.5 },]
+        );
+    }
+    #[test]
+    fn global_pointer_replaces_only_surface_local_motion() {
+        let mut state = LayerShellState::test_default(ScaleMode::Cover);
+        state.output.logical_width = 100;
+        state.output.logical_height = 100;
+        state.update_render_extent();
+        state.update_viewport_destination_for_frame(200, 100);
+
+        assert!(state.global_pointer_moved(0.0, 0.5));
+        state.pointer_entered(50.0, 50.0);
+        state.pointer_moved(75.0, 50.0);
+
+        assert_eq!(
+            state.pending_input_events.drain(),
+            vec![
+                InputEvent::PointerMove { x: 0.25, y: 0.5 },
+                InputEvent::Focus { focused: true },
+            ]
+        );
+        assert!(state.disable_global_pointer());
+        state.pointer_moved(75.0, 50.0);
+        assert_eq!(
+            state.pending_input_events.drain(),
+            vec![InputEvent::PointerMove { x: 0.625, y: 0.5 }]
+        );
+    }
+
+    #[test]
+    fn global_pointer_uses_the_full_surface_before_fit_clamping() {
+        let mut state = LayerShellState::test_default(ScaleMode::Fit);
+        state.output.logical_width = 100;
+        state.output.logical_height = 100;
+        state.update_render_extent();
+        state.update_viewport_destination_for_frame(200, 100);
+
+        assert!(state.global_pointer_moved(1.0, 1.0));
+        assert_eq!(
+            state.pending_input_events.drain(),
+            vec![InputEvent::PointerMove { x: 1.0, y: 1.0 }]
         );
     }
 }

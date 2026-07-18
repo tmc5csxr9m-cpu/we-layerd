@@ -50,6 +50,14 @@ third_party/wallpaper-engine-renderer
 - Confirm the wallpaper itself is interactive
 - If the compositor never sends pointer focus to the wallpaper surface, events will not be forwarded
 
+For optional cross-desktop motion:
+
+- Set both `general.interactive = true` and `general.global_pointer_tracking = true`, then start or switch the wallpaper again
+- Install and run `pipewire`, `xdg-desktop-portal`, and a ScreenCast-capable portal backend for the current desktop
+- Approve exactly one monitor in the system chooser; cancelling or denying intentionally keeps surface-local input
+- Check `global_pointer_tracking_active` and `global_pointer_tracking_error` in `we-layerd ctl status`
+- A portal backend that does not advertise cursor metadata is unsupported and safely falls back; do not grant root or direct input-device access
+
 ## DMA-BUF does not work
 
 - Leave `renderer.prefer_dmabuf = true`

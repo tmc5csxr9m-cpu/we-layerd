@@ -10,6 +10,7 @@ pub(crate) struct UiSettings {
     pub allow_shm_fallback: bool,
     pub interactive: bool,
     pub force_scene_audio_loop: bool,
+    pub global_pointer_tracking: bool,
     pub fps_limit: String,
     pub show_fps: bool,
     pub scale_mode: ScaleModeOption,

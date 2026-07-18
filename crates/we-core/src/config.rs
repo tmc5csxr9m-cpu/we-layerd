@@ -93,6 +93,8 @@ pub struct GeneralConfig {
     #[serde(default = "default_interactive")]
     pub interactive: bool,
     #[serde(default)]
+    pub global_pointer_tracking: bool,
+    #[serde(default)]
     pub show_fps: bool,
     #[serde(default = "default_fps_report_interval_secs")]
     pub fps_report_interval_secs: u64,
@@ -196,6 +198,7 @@ pub struct LaunchSettings {
     pub prefer_dmabuf: bool,
     pub allow_shm_fallback: bool,
     pub interactive: bool,
+    pub global_pointer_tracking: bool,
     pub fps_limit: u32,
     pub msaa_samples: u32,
     pub show_fps: bool,
@@ -307,6 +310,7 @@ impl Default for GeneralConfig {
         Self {
             backend: Backend::default(),
             interactive: default_interactive(),
+            global_pointer_tracking: false,
             show_fps: false,
             fps_report_interval_secs: default_fps_report_interval_secs(),
             scale_mode: ScaleMode::default(),
@@ -325,6 +329,7 @@ impl Default for LaunchSettings {
             prefer_dmabuf: default_prefer_dmabuf(),
             allow_shm_fallback: default_allow_shm_fallback(),
             interactive: true,
+            global_pointer_tracking: false,
             fps_limit: 60,
             msaa_samples: 1,
             show_fps: false,
@@ -345,6 +350,7 @@ impl Default for LaunchSettings {
 pub fn build_config(settings: &LaunchSettings, project_json: &Path) -> AppConfig {
     let mut cfg = AppConfig::default();
     cfg.general.interactive = settings.interactive;
+    cfg.general.global_pointer_tracking = settings.global_pointer_tracking;
     cfg.general.show_fps = settings.show_fps;
     cfg.general.scale_mode = settings.scale_mode;
     cfg.general.force_scene_audio_loop = settings.force_scene_audio_loop;
@@ -408,7 +414,7 @@ pub fn build_config_for_wallpaper(
 }
 
 pub fn save_config(path: &Path, config: &AppConfig) -> Result<()> {
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
@@ -435,6 +441,7 @@ pub fn load_launch_settings(path: &Path) -> Result<LaunchSettings> {
         prefer_dmabuf: cfg.renderer.prefer_dmabuf,
         allow_shm_fallback: cfg.renderer.allow_shm_fallback,
         interactive: cfg.general.interactive,
+        global_pointer_tracking: cfg.general.global_pointer_tracking,
         fps_limit: cfg.renderer.fps.max(1),
         msaa_samples: cfg.renderer.msaa_samples.max(1),
         show_fps: cfg.general.show_fps,
@@ -494,6 +501,14 @@ pub fn merge_scene_source_options(
 }
 
 pub fn save_force_scene_audio_loop(path: &Path, enabled: bool) -> Result<()> {
+    save_general_bool(path, "force_scene_audio_loop", enabled)
+}
+
+pub fn save_global_pointer_tracking(path: &Path, enabled: bool) -> Result<()> {
+    save_general_bool(path, "global_pointer_tracking", enabled)
+}
+
+fn save_general_bool(path: &Path, key: &str, enabled: bool) -> Result<()> {
     let mut document = load_config_document(path)?;
     let Some(root) = document.as_table_mut() else {
         bail!("config root in {} must be a TOML table", path.display());
@@ -502,7 +517,7 @@ pub fn save_force_scene_audio_loop(path: &Path, enabled: bool) -> Result<()> {
     let Some(general) = general.as_table_mut() else {
         bail!("general config in {} must be a TOML table", path.display());
     };
-    general.insert("force_scene_audio_loop".to_string(), toml::Value::Boolean(enabled));
+    general.insert(key.to_string(), toml::Value::Boolean(enabled));
 
     save_config_document(path, &document)
 }
@@ -716,7 +731,7 @@ fn load_config_document(path: &Path) -> Result<toml::Value> {
 }
 
 fn save_config_document(path: &Path, document: &toml::Value) -> Result<()> {
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
@@ -760,10 +775,10 @@ mod tests {
 
     use super::{
         build_config, build_config_for_wallpaper, load_launch_settings, merge_scene_source_options,
-        save_force_scene_audio_loop, save_integrations_and_rules, save_outputs, save_playlists,
-        save_profiles_and_outputs, save_wallpapers_playlists_and_outputs, HookCommand, HooksConfig,
-        IntegrationsConfig, LaunchSettings, OutputBinding, RuntimeRuleAction, RuntimeRulesConfig,
-        ScaleMode,
+        save_force_scene_audio_loop, save_global_pointer_tracking, save_integrations_and_rules,
+        save_outputs, save_playlists, save_profiles_and_outputs,
+        save_wallpapers_playlists_and_outputs, HookCommand, HooksConfig, IntegrationsConfig,
+        LaunchSettings, OutputBinding, RuntimeRuleAction, RuntimeRulesConfig, ScaleMode,
     };
     use crate::playlist::{Playlist, PlaylistConfig, PlaylistItem, PlaylistMode};
     use crate::profile::{OutputProfile, ProfileConfig};
@@ -804,6 +819,7 @@ mod tests {
         assert_eq!(cfg.renderer.fps, 144);
         assert_eq!(cfg.renderer.options_json.as_deref(), Some("{\"demo\":true}"));
         assert!(!cfg.general.interactive);
+        assert!(!cfg.general.global_pointer_tracking);
         assert_eq!(cfg.general.scale_mode, ScaleMode::Fit);
         assert_eq!(cfg.hooks, hooks);
     }
@@ -925,6 +941,7 @@ mod tests {
 [general]
 backend = "layer_shell"
 interactive = false
+global_pointer_tracking = true
 show_fps = true
 fps_report_interval_secs = 1
 scale_mode = "stretch"
@@ -953,6 +970,7 @@ options_json = "{\"keep\":true}"
         assert!(!settings.interactive);
         assert!(settings.force_scene_audio_loop);
         assert_eq!(settings.msaa_samples, 4);
+        assert!(settings.global_pointer_tracking);
         assert_eq!(settings.scale_mode, ScaleMode::Stretch);
         assert_eq!(settings.renderer_library_path, "/opt/libwallpaper-engine-renderer.so");
         assert_eq!(settings.renderer_cache_path, "~/.cache/we-layerd/custom");
@@ -961,6 +979,24 @@ options_json = "{\"keep\":true}"
         assert_eq!(settings.options_json.as_deref(), Some("{\"keep\":true}"));
         assert_eq!(settings.workshop_path, "/tmp/workshop/content/431960");
         assert_eq!(settings.assets_path, "/opt/wallpaper_engine");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn global_pointer_preference_patch_preserves_unknown_config_sections() {
+        let path = unique_temp_path("global-pointer-preference");
+        fs::write(
+            &path,
+            "[general]\ninteractive = true\n\n[gnome]\ncustom = \"keep\"\n",
+        )
+        .expect("write config");
+
+        save_global_pointer_tracking(&path, true).expect("save global pointer preference");
+        let document = fs::read_to_string(&path).expect("read config");
+        let value = toml::from_str::<toml::Value>(&document).expect("valid TOML");
+        assert_eq!(value["general"]["global_pointer_tracking"].as_bool(), Some(true));
+        assert_eq!(value["gnome"]["custom"].as_str(), Some("keep"));
 
         let _ = fs::remove_file(path);
     }

@@ -27,6 +27,7 @@ use we_renderer::{FillMode, Frame, RenderConfig, Source};
 use crate::{
     backend::{
         layer_shell::{
+            global_pointer::{GlobalPointerEvent, GlobalPointerTracker},
             presenter,
             state::{BufferBookkeeping, FrameCallbackState, LayerShellState, WaylandObjects},
             surface,
@@ -354,6 +355,7 @@ pub(crate) fn run_output(ctx: BackendContext<'_>, target_output: &str) -> Result
         output,
         presentation_geometry,
         pointer_input: Default::default(),
+        global_pointer_active: false,
         last_input_region: None,
         buffers: BufferBookkeeping::default(),
         frame_callback: FrameCallbackState {
@@ -368,6 +370,7 @@ pub(crate) fn run_output(ctx: BackendContext<'_>, target_output: &str) -> Result
             allow_shm_fallback: cfg.renderer.allow_shm_fallback,
             media_integration_supported,
             audio_integration_supported,
+            global_pointer_tracking_configured: cfg.general.global_pointer_tracking,
             options_json: OptionsJsonDiagnostics {
                 present: options_json_present,
                 len: options_json_len,
@@ -519,6 +522,29 @@ pub(crate) fn run_output(ctx: BackendContext<'_>, target_output: &str) -> Result
         "starting renderer-backed wayland surface"
     );
 
+    let global_pointer_tracker = if cfg.general.global_pointer_tracking && cfg.general.interactive {
+        tracing::info!(
+            "requesting one monitor through the ScreenCast portal for optional global pointer tracking"
+        );
+        match GlobalPointerTracker::start() {
+            Ok(tracker) => Some(tracker),
+            Err(error) => {
+                let reason = format!("failed to start global pointer worker: {error}");
+                tracing::warn!(%reason, "using surface-local pointer input");
+                state.diagnostics.global_pointer_tracking_error = Some(reason);
+                None
+            }
+        }
+    } else {
+        if cfg.general.global_pointer_tracking {
+            let reason = "global pointer tracking requires general.interactive = true".to_string();
+            tracing::warn!(%reason, "using surface-local pointer input");
+            state.diagnostics.global_pointer_tracking_error = Some(reason);
+        }
+        None
+    };
+    status_sink(state.snapshot());
+
     let mut last_acquire_status: i32 = 1;
     let mut last_log = std::time::Instant::now();
     let render_interval = frame_interval(cfg.renderer.fps);
@@ -570,6 +596,29 @@ pub(crate) fn run_output(ctx: BackendContext<'_>, target_output: &str) -> Result
         }
 
         apply_host_integrations(&mut state, &host_integrations);
+        apply_host_integrations(&mut state, &host_integrations);
+
+        // Cursor metadata only replaces motion. Wayland surface focus, buttons,
+        // wheel events, and their release ordering remain authoritative.
+        if let Some(tracker) = &global_pointer_tracker {
+            while let Some(event) = tracker.try_recv() {
+                match event {
+                    GlobalPointerEvent::Position { normalized_x, normalized_y } => {
+                        if state.global_pointer_moved(normalized_x, normalized_y) {
+                            tracing::info!("global pointer metadata is active");
+                        }
+                    }
+                    GlobalPointerEvent::Unavailable(reason) => {
+                        if state.disable_global_pointer() {
+                            tracing::warn!(%reason, "global pointer metadata stopped; using surface-local pointer input");
+                        } else {
+                            tracing::warn!(%reason, "global pointer metadata unavailable; using surface-local pointer input");
+                        }
+                        state.diagnostics.global_pointer_tracking_error = Some(reason);
+                    }
+                }
+            }
+        }
 
         // Forward input events
         let input_events = state.pending_input_events.drain();

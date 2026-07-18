@@ -14,6 +14,8 @@ Wayland output discovery (`wl_output.name`)
 -> output-bound Wayland layer-shell surface
 -> pointer input forwarding
 -> per-output status / playlist state
+-> optional portal/PipeWire cursor-metadata motion
+-> IPC control
 ```
 
 `we-layerd` no longer launches Wallpaper Engine through Wine and no longer captures X11 windows.
@@ -69,6 +71,8 @@ Current behavior:
 - presentation paced by `wl_surface.frame` callbacks
 - acquire throttled by an in-flight buffer cap
 - pointer input forwarding when `general.interactive = true`
+- live per-output runtime status exported through `we-layerd ctl status`
+- optional layer-shell global motion: a stop-aware worker requests one monitor through XDG ScreenCast, reads only PipeWire `MetaCursor`, and feeds normalized motion back to the renderer loop; all failures preserve the surface-local path
 - live per-output runtime status exported through `we-layerd ctl status`
 - linux-dmabuf v4 surface feedback, with v3 global modifier fallback
 - exact `(fourcc, modifier)` capability forwarding to the renderer before output binding

@@ -25,6 +25,7 @@ assets_path = "/path/to/Steam/steamapps/common/wallpaper_engine/assets"
 ```toml
 [general]
 interactive = true
+global_pointer_tracking = false
 show_fps = false
 fps_report_interval_secs = 1
 scale_mode = "cover"
@@ -33,9 +34,16 @@ force_scene_audio_loop = false
 
 - 后端自动选择：GNOME 会话走 GNOME actor clone，其它桌面环境走 layer-shell
 - `interactive`：为 `false` 时会设置空 input region，让壁纸不阻挡桌面鼠标交互
+- `global_pointer_tracking`：仅用于 layer-shell，默认关闭。与 `interactive = true` 一起开启后，下次启动或切换壁纸时，系统 ScreenCast 选择器会要求用户明确批准一块显示器。若用户取消或拒绝、portal 不提供 cursor metadata、或 PipeWire 流出错，守护进程不会失败，而会退回 surface-local 指针移动。
 - `show_fps`：保留 FPS 统计开关
 - `force_scene_audio_loop`：默认关闭；开启后会循环原本设为 `single`、可见且自动开始播放的 scene 声音，不改变 start-silent 声音和 `random` 播放。守护进程会把它安全合并到 `scene.audio.forceLoop`，并保留其它版本 1 source options。
 - `scale_mode`：`fit`、`cover`、`stretch`
+
+### 可选全局指针的权限与隐私
+
+权限完全通过系统 ScreenCast portal 的界面授予。`we-layerd` 只请求 `CursorMode::Metadata`、显示器来源、单选以及 `PersistMode::DoNot`；不请求 root、输入设备权限或持久授权。该协议下 portal 与合成器仍会生成视频流，但 `we-layerd` 连接 portal 限定的 PipeWire 流时不使用 `MAP_BUFFERS`，只读取 `MetaCursor`，绝不映射、读取、复制或保存图像 plane。启用 metadata 时只替代指针移动；按钮、滚轮、焦点与释放顺序仍来自 layer surface。
+
+可在 `we-layerd ctl status` 中查看 `global_pointer_tracking_configured`、`global_pointer_tracking_active` 和 `global_pointer_tracking_error`。
 
 ## Renderer 设置
 

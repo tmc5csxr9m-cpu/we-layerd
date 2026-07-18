@@ -89,6 +89,20 @@ pub(super) fn text(key: Text) -> &'static str {
         Text::RuleMute => "静音壁纸",
         Text::RulePause => "暂停壁纸",
         Text::IntegrationRuntimeStatus => "集成运行状态",
+        Text::TrackPointerAcrossDesktop => "跟踪桌面鼠标指针",
+        Text::TrackPointerAcrossDesktopDescription => {
+            "在 layer-shell 下，下次启动或切换壁纸时，系统 ScreenCast portal 会要求你选择一块显示器。Portal 和合成器仍会产生视频流；we-layerd 只读取指针元数据，不会映射、读取或保存图像数据。"
+        }
+        Text::PortalAuthorization => "Portal 授权",
+        Text::PortalAuthorizationDescription => {
+            "请在系统授权选择器中选择一个显示器，以允许跟踪指针元数据。"
+        }
+        Text::PortalAuthorizationFallback => {
+            "Portal 跟踪不可用；将回退到仅跟踪壁纸表面内的鼠标输入。"
+        }
+        Text::PortalAuthorizationCancelled => {
+            "Portal 授权已取消；将回退到仅跟踪壁纸表面内的鼠标输入。"
+        }
         Text::ShowRealtimeFps => "显示实时 FPS",
         Text::PreferDmabuf => "优先使用 DMA-BUF 呈现",
         Text::AllowShmFallback => "允许回退到 SHM",

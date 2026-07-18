@@ -212,6 +212,16 @@ pub(crate) fn update(app: &mut App, message: Message) -> Task<Message> {
             }
             Task::none()
         }
+        Message::GlobalPointerTrackingToggled(value) => {
+            if let Err(error) = config::persist_global_pointer_tracking(&app.config_path, value) {
+                app.runtime_status = RuntimeStatus::ConfigSaveFailed(error.clone());
+                eprintln!("failed to save config: {error}");
+            } else {
+                app.ui_settings.global_pointer_tracking = value;
+                super::settings::sync(app);
+            }
+            Task::none()
+        }
         Message::ShowFpsToggled(value) => {
             app.ui_settings.show_fps = value;
             super::settings::sync(app);

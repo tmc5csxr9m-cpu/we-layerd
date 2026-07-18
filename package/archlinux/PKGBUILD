@@ -24,14 +24,21 @@ depends=(
   'lz4'
   'mesa'
   'pango'
+  'pipewire'
   'vulkan-icd-loader'
   'wayland'
   'xdotool'
 )
 optdepends=(
   'gst-plugin-va: VA-API hardware video decoding'
+  'xdg-desktop-portal: optional global pointer tracking portal'
+  'xdg-desktop-portal-gnome: ScreenCast backend for GNOME'
+  'xdg-desktop-portal-hyprland: ScreenCast backend for Hyprland'
+  'xdg-desktop-portal-kde: ScreenCast backend for Plasma'
+  'xdg-desktop-portal-wlr: ScreenCast backend for wlroots compositors'
 )
 makedepends=(
+  'clang'
   'cmake'
   'git'
   'pkgconf'
