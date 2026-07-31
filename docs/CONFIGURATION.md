@@ -282,8 +282,7 @@ unsupported value falls back to English. The GUI writes this file atomically wit
 same-directory temporary file and rename; it does not modify renderer settings when
 the language changes.
 
-Run the GUI unit, persistence, and semantic widget tests with the deterministic
-headless renderer:
+Run the GUI unit and persistence tests with:
 
 ```bash
 ./scripts/test-gui

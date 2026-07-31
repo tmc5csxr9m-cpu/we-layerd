@@ -9,6 +9,11 @@ use crate::{
 
 use super::{App, Message};
 
+const SPEED_MIN: f32 = 0.1;
+const SPEED_MAX: f32 = 3.0;
+const VOLUME_PERCENT_MIN: f32 = 0.0;
+const VOLUME_PERCENT_MAX: f32 = 100.0;
+
 pub(crate) fn update(app: &mut App, message: wallpaper_detail::DetailMessage) -> Task<Message> {
     use wallpaper_detail::{DetailMessage, ResolutionMode};
 
@@ -65,13 +70,15 @@ pub(crate) fn update(app: &mut App, message: wallpaper_detail::DetailMessage) ->
             }
         }
         DetailMessage::SpeedChanged(value) => {
-            if let Some(value) = wallpaper_detail::normalize_speed(value) {
+            app.speed_input = value;
+            if let Some(value) = parse_bounded_input(&app.speed_input, SPEED_MIN, SPEED_MAX) {
                 profile.speed = value;
             }
         }
         DetailMessage::VolumeChanged(value) => {
-            if let Some(value) = wallpaper_detail::normalize_volume(value) {
-                profile.volume = value;
+            app.volume_input = value;
+            if let Some(percent) = parse_bounded_input(&app.volume_input, VOLUME_PERCENT_MIN, VOLUME_PERCENT_MAX) {
+                profile.volume = percent / 100.0;
             }
         }
         DetailMessage::MutedChanged(value) => profile.muted = value,
@@ -126,7 +133,14 @@ fn sync_fixed_resolution(profile: &mut WallpaperSettings, width: &str, height: &
         RenderResolution::Fixed { width: width.max(1), height: height.max(1) };
 }
 
-pub(crate) fn set_resolution_inputs(app: &mut App, profile: &WallpaperSettings) {
+fn parse_bounded_input(value: &str, minimum: f32, maximum: f32) -> Option<f32> {
+    let value = value.trim().parse::<f32>().ok()?;
+    value.is_finite().then(|| value.clamp(minimum, maximum))
+}
+
+pub(crate) fn set_detail_inputs(app: &mut App, profile: &WallpaperSettings) {
+    app.speed_input = format!("{:.2}", profile.speed);
+    app.volume_input = format!("{:.0}", profile.volume * 100.0);
     match profile.render_resolution {
         RenderResolution::Automatic => {
             app.resolution_width.clear();

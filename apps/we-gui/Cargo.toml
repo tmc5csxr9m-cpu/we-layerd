@@ -18,6 +18,3 @@ we-core = { path = "../../crates/we-core" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
-
-[dev-dependencies]
-iced_test = "0.14"

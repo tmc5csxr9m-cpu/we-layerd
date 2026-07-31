@@ -29,6 +29,8 @@ pub(crate) struct App {
     pub entries: Vec<WallpaperEntry>,
     pub selected_id: Option<String>,
     pub selected_schema: UserPropertySchema,
+    pub speed_input: String,
+    pub volume_input: String,
     pub resolution_width: String,
     pub resolution_height: String,
     pub config_path: PathBuf,

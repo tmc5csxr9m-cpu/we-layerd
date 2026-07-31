@@ -92,6 +92,8 @@ pub(crate) fn initialize() -> (App, Task<Message>) {
             entries: Vec::new(),
             selected_id: None,
             selected_schema: UserPropertySchema { entries: Vec::new() },
+            speed_input: "1.00".to_string(),
+            volume_input: "100".to_string(),
             resolution_width: String::new(),
             resolution_height: String::new(),
             config_path,
