@@ -64,8 +64,16 @@ pub(crate) fn update(app: &mut App, message: wallpaper_detail::DetailMessage) ->
                 profile.fps = fps.clamp(1, 360);
             }
         }
-        DetailMessage::SpeedChanged(value) => profile.speed = value,
-        DetailMessage::VolumeChanged(value) => profile.volume = value,
+        DetailMessage::SpeedChanged(value) => {
+            if let Some(value) = wallpaper_detail::normalize_speed(value) {
+                profile.speed = value;
+            }
+        }
+        DetailMessage::VolumeChanged(value) => {
+            if let Some(value) = wallpaper_detail::normalize_volume(value) {
+                profile.volume = value;
+            }
+        }
         DetailMessage::MutedChanged(value) => profile.muted = value,
         DetailMessage::MsaaChanged(value) => profile.msaa_samples = value.max(1),
         DetailMessage::ResolutionModeChanged(ResolutionMode::Automatic) => {

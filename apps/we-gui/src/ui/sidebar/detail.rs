@@ -21,6 +21,15 @@ use we_core::wallpaper::{
     WallpaperEntry, WallpaperType,
 };
 
+const SPEED_SLIDER_ID: &str = "detail.speed";
+const VOLUME_SLIDER_ID: &str = "detail.volume";
+pub(crate) const SPEED_MIN: f32 = 0.1;
+pub(crate) const SPEED_MAX: f32 = 3.0;
+const SPEED_STEP: f32 = 0.01;
+pub(crate) const VOLUME_MIN: f32 = 0.0;
+pub(crate) const VOLUME_MAX: f32 = 1.0;
+const VOLUME_STEP: f32 = 0.01;
+
 #[derive(Debug, Clone)]
 pub enum DetailMessage {
     Apply,
@@ -224,19 +233,11 @@ fn actions_view<'a>(
                 .padding([14, 10])
                 .style(md_text_input_style),
             text(language.speed(settings.speed)).size(13).color(Color::from_rgb8(196, 199, 204)),
-            container(
-                slider(0.1..=3.0, settings.speed, DetailMessage::SpeedChanged)
-                    .style(md_slider_style)
-            )
-            .id("detail.speed"),
+            speed_slider(settings.speed),
             text(language.volume(settings.volume * 100.0))
                 .size(13)
                 .color(Color::from_rgb8(196, 199, 204)),
-            container(
-                slider(0.0..=1.0, settings.volume, DetailMessage::VolumeChanged)
-                    .style(md_slider_style)
-            )
-            .id("detail.volume"),
+            volume_slider(settings.volume),
             container(
                 checkbox(settings.muted)
                     .label(language.text(Text::MuteWallpaperAudio))
@@ -330,6 +331,34 @@ fn actions_view<'a>(
     );
 
     column![playback, presentation].spacing(16).into()
+}
+
+fn speed_slider(value: f32) -> Element<'static, DetailMessage> {
+    container(slider(SPEED_MIN..=SPEED_MAX, value, DetailMessage::SpeedChanged)
+        .step(SPEED_STEP)
+        .style(md_slider_style))
+        .id(SPEED_SLIDER_ID)
+        .into()
+}
+
+fn volume_slider(value: f32) -> Element<'static, DetailMessage> {
+    container(slider(VOLUME_MIN..=VOLUME_MAX, value, DetailMessage::VolumeChanged)
+        .step(VOLUME_STEP)
+        .style(md_slider_style))
+        .id(VOLUME_SLIDER_ID)
+        .into()
+}
+
+pub(crate) fn normalize_speed(value: f32) -> Option<f32> {
+    normalize_slider_value(value, SPEED_MIN, SPEED_MAX)
+}
+
+pub(crate) fn normalize_volume(value: f32) -> Option<f32> {
+    normalize_slider_value(value, VOLUME_MIN, VOLUME_MAX)
+}
+
+fn normalize_slider_value(value: f32, minimum: f32, maximum: f32) -> Option<f32> {
+    value.is_finite().then(|| value.clamp(minimum, maximum))
 }
 
 fn output_chips<'a>(
@@ -592,5 +621,64 @@ pub(crate) fn md_slider_style(
             border_width: 0.0,
             border_color: Color::TRANSPARENT,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use iced::{keyboard::key::Named, widget::Id};
+    use iced_test::simulator;
+
+    use super::{
+        normalize_speed, normalize_volume, speed_slider, volume_slider, DetailMessage,
+        SPEED_MAX, SPEED_MIN, SPEED_SLIDER_ID, VOLUME_MAX, VOLUME_MIN, VOLUME_SLIDER_ID,
+    };
+
+    #[test]
+    fn playback_values_are_clamped_and_non_finite_values_are_rejected() {
+        assert_eq!(normalize_speed(SPEED_MIN - 1.0), Some(SPEED_MIN));
+        assert_eq!(normalize_speed(SPEED_MAX + 1.0), Some(SPEED_MAX));
+        assert_eq!(normalize_volume(VOLUME_MIN - 1.0), Some(VOLUME_MIN));
+        assert_eq!(normalize_volume(VOLUME_MAX + 1.0), Some(VOLUME_MAX));
+        assert_eq!(normalize_speed(f32::NAN), None);
+        assert_eq!(normalize_volume(f32::INFINITY), None);
+    }
+
+    #[test]
+    fn volume_slider_uses_one_percent_semantic_steps() {
+        let mut ui = simulator(volume_slider(0.2));
+
+        ui.click(Id::new(VOLUME_SLIDER_ID))
+            .expect("volume slider should be selectable by its stable ID");
+        ui.tap_key(Named::ArrowUp);
+
+        let values = ui.into_messages().filter_map(|message| match message {
+            DetailMessage::VolumeChanged(value) => Some(value),
+            _ => None,
+        }).collect::<Vec<_>>();
+
+        assert_close(values[0], 0.5);
+        assert_close(*values.last().expect("volume change message"), 0.51);
+    }
+
+    #[test]
+    fn speed_slider_uses_one_hundredth_semantic_steps() {
+        let mut ui = simulator(speed_slider(1.0));
+
+        ui.click(Id::new(SPEED_SLIDER_ID))
+            .expect("speed slider should be selectable by its stable ID");
+        ui.tap_key(Named::ArrowUp);
+
+        let values = ui.into_messages().filter_map(|message| match message {
+            DetailMessage::SpeedChanged(value) => Some(value),
+            _ => None,
+        }).collect::<Vec<_>>();
+
+        assert_close(values[0], 1.55);
+        assert_close(*values.last().expect("speed change message"), 1.56);
+    }
+
+    fn assert_close(actual: f32, expected: f32) {
+        assert!((actual - expected).abs() < 0.0001, "expected {expected}, got {actual}");
     }
 }

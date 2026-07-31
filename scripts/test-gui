@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+export ICED_TEST_BACKEND="${ICED_TEST_BACKEND:-tiny-skia}"
+exec cargo test --locked -p we-gui
