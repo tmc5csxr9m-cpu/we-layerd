@@ -5,6 +5,26 @@ upstream base while retaining the optional XDG ScreenCast/PipeWire global pointe
 Branches used by upstream pull requests remain independent and do not inherit this personal-only
 integration policy.
 
+## Audio response
+
+Local builds pin the renderer submodule to the fork's `personal/main` branch. Scene wallpapers use
+the renderer's existing system-output spectrum path. The personal renderer additionally completes
+Wallpaper Engine's Web audio-response contract:
+
+- Web wallpapers opt in with `general.supportsaudioprocessing: true` in `project.json`.
+- The renderer captures the desktop output through a PulseAudio monitor source (including
+  PipeWire's PulseAudio compatibility server), computes 64 frequency bands per channel, and sends
+  left 64 followed by right 64 at roughly 30 Hz.
+- An explicit host-provided `audio_samples` stream takes precedence, preventing two spectrum
+  producers from driving the same wallpaper.
+- Capture is lazy: wallpapers that do not opt in never open a monitor device.
+
+The data layout and opt-in behavior follow Wallpaper Engine's official
+[Web audio visualization](https://docs.wallpaperengine.io/en/web/audio/visualizer.html) contract.
+SceneScript's corresponding buffer sizes and per-frame update model are documented in the official
+[audio-response tutorial](https://docs.wallpaperengine.io/en/scene/scenescript/tutorial/audio.html)
+and [AudioBuffers reference](https://docs.wallpaperengine.io/en/scene/scenescript/reference/class/AudioBuffers.html).
+
 ## Upstream notification
 
 Install the checker and its user service:
