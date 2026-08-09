@@ -1,4 +1,7 @@
 /target
+/artifacts/
+__pycache__/
+*.py[cod]
 package/source-out/
 package/fedora/out/
 package/ubuntu/out/

@@ -5,6 +5,28 @@ upstream base while retaining the optional XDG ScreenCast/PipeWire global pointe
 Branches used by upstream pull requests remain independent and do not inherit this personal-only
 integration policy.
 
+## Semantic ScreenCast portal helper
+
+Restarting a build with personal-only global pointer tracking opens GNOME's ScreenCast portal.
+The AT-SPI adapter selects or preserves exactly one monitor and invokes the accessible Share
+action without screen coordinates or input injection. It fails closed when controls are missing or
+ambiguous and writes diagnostic state below `artifacts/gui/`.
+
+Install the Arch Linux runtime dependencies and inspect the dialog without approving it:
+
+```bash
+sudo pacman -S python-atspi at-spi2-core
+./scripts/gui-test/approve-screen-share.py --dry-run
+```
+
+Approve a chooser that exposes exactly one monitor:
+
+```bash
+./scripts/gui-test/approve-screen-share.py
+```
+
+Pass `--monitor 'accessible monitor name'` when the chooser contains several monitors.
+
 ## Audio response
 
 Local builds pin the renderer submodule to the fork's `personal/main` branch. Scene wallpapers use
