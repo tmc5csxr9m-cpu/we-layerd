@@ -77,7 +77,9 @@ pub(crate) fn update(app: &mut App, message: wallpaper_detail::DetailMessage) ->
         }
         DetailMessage::VolumeChanged(value) => {
             app.volume_input = value;
-            if let Some(percent) = parse_bounded_input(&app.volume_input, VOLUME_PERCENT_MIN, VOLUME_PERCENT_MAX) {
+            if let Some(percent) =
+                parse_bounded_input(&app.volume_input, VOLUME_PERCENT_MIN, VOLUME_PERCENT_MAX)
+            {
                 profile.volume = percent / 100.0;
             }
         }

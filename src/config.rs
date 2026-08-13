@@ -318,7 +318,7 @@ mod tests {
         let cfg: Config = toml::from_str(
             "[general]\nbackend = \"layer_shell\"\nglobal_pointer_tracking = true\n",
         )
-            .expect("valid layer_shell backend");
+        .expect("valid layer_shell backend");
         assert_eq!(cfg.general.backend, ConfigBackend::LayerShell);
         assert!(cfg.general.global_pointer_tracking);
     }

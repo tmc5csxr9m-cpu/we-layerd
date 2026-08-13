@@ -986,11 +986,8 @@ options_json = "{\"keep\":true}"
     #[test]
     fn global_pointer_preference_patch_preserves_unknown_config_sections() {
         let path = unique_temp_path("global-pointer-preference");
-        fs::write(
-            &path,
-            "[general]\ninteractive = true\n\n[gnome]\ncustom = \"keep\"\n",
-        )
-        .expect("write config");
+        fs::write(&path, "[general]\ninteractive = true\n\n[gnome]\ncustom = \"keep\"\n")
+            .expect("write config");
 
         save_global_pointer_tracking(&path, true).expect("save global pointer preference");
         let document = fs::read_to_string(&path).expect("read config");

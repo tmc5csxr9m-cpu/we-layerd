@@ -112,12 +112,7 @@ fn worker_main(
         }
     };
 
-    let result = run_pipewire(
-        portal_stream.node_id,
-        portal_stream.fd,
-        event_tx.clone(),
-        stop,
-    );
+    let result = run_pipewire(portal_stream.node_id, portal_stream.fd, event_tx.clone(), stop);
     let _ = runtime.block_on(portal_stream.session.close());
     drop(portal_stream.portal);
 
@@ -140,8 +135,7 @@ async fn open_portal(mut stop: watch::Receiver<bool>) -> Result<PortalOpen> {
         }
         _ = wait_for_stop(&mut stop) => return Ok(PortalOpen::Stopped),
     };
-    let Some(portal) =
-        portal_step(&mut stop, Screencast::with_connection(connection)).await?
+    let Some(portal) = portal_step(&mut stop, Screencast::with_connection(connection)).await?
     else {
         return Ok(PortalOpen::Stopped);
     };
@@ -194,22 +188,18 @@ async fn open_portal(mut stop: watch::Receiver<bool>) -> Result<PortalOpen> {
             .context("monitor selection was cancelled or denied by the ScreenCast portal");
     }
 
-    let start_request = match portal_step(
-        &mut stop,
-        portal.start(&session, None, Default::default()),
-    )
-    .await
-    {
-        Ok(Some(request)) => request,
-        Ok(None) => {
-            let _ = session.close().await;
-            return Ok(PortalOpen::Stopped);
-        }
-        Err(error) => {
-            let _ = session.close().await;
-            return Err(error);
-        }
-    };
+    let start_request =
+        match portal_step(&mut stop, portal.start(&session, None, Default::default())).await {
+            Ok(Some(request)) => request,
+            Ok(None) => {
+                let _ = session.close().await;
+                return Ok(PortalOpen::Stopped);
+            }
+            Err(error) => {
+                let _ = session.close().await;
+                return Err(error);
+            }
+        };
     let response = match start_request.response() {
         Ok(response) => response,
         Err(error) => {
@@ -227,22 +217,20 @@ async fn open_portal(mut stop: watch::Receiver<bool>) -> Result<PortalOpen> {
     // provides this compatibility node id, so use it with the portal-scoped FD.
     let node_id = stream.pipe_wire_node_id();
 
-    let fd = match portal_step(
-        &mut stop,
-        portal.open_pipe_wire_remote(&session, Default::default()),
-    )
-    .await
-    {
-        Ok(Some(fd)) => fd,
-        Ok(None) => {
-            let _ = session.close().await;
-            return Ok(PortalOpen::Stopped);
-        }
-        Err(error) => {
-            let _ = session.close().await;
-            return Err(error);
-        }
-    };
+    let fd =
+        match portal_step(&mut stop, portal.open_pipe_wire_remote(&session, Default::default()))
+            .await
+        {
+            Ok(Some(fd)) => fd,
+            Ok(None) => {
+                let _ = session.close().await;
+                return Ok(PortalOpen::Stopped);
+            }
+            Err(error) => {
+                let _ = session.close().await;
+                return Err(error);
+            }
+        };
 
     tracing::info!(
         portal_version = portal.version(),
@@ -281,11 +269,10 @@ struct PipeWireUserData {
 }
 
 fn cursor_metadata_param() -> Result<Vec<u8>> {
-    let base_size = mem::size_of::<spa::sys::spa_meta_cursor>()
-        + mem::size_of::<spa::sys::spa_meta_bitmap>();
-    let size_for_side = |side: usize| {
-        (base_size + side * side * CURSOR_BITMAP_BYTES_PER_PIXEL) as i32
-    };
+    let base_size =
+        mem::size_of::<spa::sys::spa_meta_cursor>() + mem::size_of::<spa::sys::spa_meta_bitmap>();
+    let size_for_side =
+        |side: usize| (base_size + side * side * CURSOR_BITMAP_BYTES_PER_PIXEL) as i32;
     let metadata = spa::pod::object!(
         spa::utils::SpaTypes::ObjectParamMeta,
         spa::param::ParamType::Meta,
@@ -323,8 +310,8 @@ fn run_pipewire(
 ) -> Result<()> {
     pw::init();
 
-    let mainloop = pw::main_loop::MainLoopRc::new(None)
-        .context("failed to create PipeWire main loop")?;
+    let mainloop =
+        pw::main_loop::MainLoopRc::new(None).context("failed to create PipeWire main loop")?;
     let context = pw::context::ContextRc::new(&mainloop, None)
         .context("failed to create PipeWire context")?;
     let core = context
@@ -440,10 +427,9 @@ fn run_pipewire(
             ) else {
                 return;
             };
-            let _ = user_data.event_tx.send(GlobalPointerEvent::Position {
-                normalized_x,
-                normalized_y,
-            });
+            let _ = user_data
+                .event_tx
+                .send(GlobalPointerEvent::Position { normalized_x, normalized_y });
 
             // Deliberately do not call Buffer::datas_mut(): the image planes
             // are never mapped, inspected, copied, or saved by we-layerd.
@@ -576,10 +562,7 @@ fn normalize_cursor_position(x: i32, y: i32, width: u32, height: u32) -> Option<
     if width == 0 || height == 0 {
         return None;
     }
-    Some((
-        (x as f64 / width as f64).clamp(0.0, 1.0),
-        (y as f64 / height as f64).clamp(0.0, 1.0),
-    ))
+    Some(((x as f64 / width as f64).clamp(0.0, 1.0), (y as f64 / height as f64).clamp(0.0, 1.0)))
 }
 
 #[cfg(test)]

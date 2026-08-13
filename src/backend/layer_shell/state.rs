@@ -176,7 +176,9 @@ impl LayerShellState {
     pub(super) fn pointer_entered(&mut self, surface_x: f64, surface_y: f64) {
         let events = self.pointer_input.enter(surface_x, surface_y, self.presentation_geometry);
         for event in events {
-            if self.global_pointer_active && matches!(event, we_renderer::InputEvent::PointerMove { .. }) {
+            if self.global_pointer_active
+                && matches!(event, we_renderer::InputEvent::PointerMove { .. })
+            {
                 continue;
             }
             self.pending_input_events.push(event);
@@ -203,11 +205,8 @@ impl LayerShellState {
 
         let surface_x = normalized_x.clamp(0.0, 1.0) * self.output.logical_width as f64;
         let surface_y = normalized_y.clamp(0.0, 1.0) * self.output.logical_height as f64;
-        let Some((x, y)) = map_surface_position(
-            surface_x,
-            surface_y,
-            self.presentation_geometry,
-        ) else {
+        let Some((x, y)) = map_surface_position(surface_x, surface_y, self.presentation_geometry)
+        else {
             return false;
         };
 
@@ -423,10 +422,7 @@ mod tests {
 
         assert_eq!(
             state.pending_input_events.drain(),
-            vec![
-                InputEvent::PointerMove { x: 0.25, y: 0.5 },
-                InputEvent::Focus { focused: true },
-            ]
+            vec![InputEvent::PointerMove { x: 0.25, y: 0.5 }, InputEvent::Focus { focused: true },]
         );
         assert!(state.disable_global_pointer());
         state.pointer_moved(75.0, 50.0);

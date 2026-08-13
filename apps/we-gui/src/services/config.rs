@@ -4,9 +4,9 @@ use we_core::{
     config::{
         build_config_for_wallpaper, save_config, save_force_scene_audio_loop,
         save_global_pointer_tracking, save_integrations_and_rules,
-        save_playlists_profiles_and_outputs,
-        save_profiles_and_outputs, save_wallpapers, save_wallpapers_playlists_profiles_and_outputs,
-        IntegrationsConfig, LaunchSettings, OutputBinding, RuntimeRulesConfig,
+        save_playlists_profiles_and_outputs, save_profiles_and_outputs, save_wallpapers,
+        save_wallpapers_playlists_profiles_and_outputs, IntegrationsConfig, LaunchSettings,
+        OutputBinding, RuntimeRulesConfig,
     },
     playlist::PlaylistConfig,
     profile::ProfileConfig,

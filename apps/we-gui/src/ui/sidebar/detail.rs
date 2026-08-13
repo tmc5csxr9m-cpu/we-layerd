@@ -6,9 +6,7 @@ use crate::{
 };
 use iced::{
     alignment::Horizontal,
-    widget::{
-        button, checkbox, column, container, pick_list, row, scrollable, text, text_input,
-    },
+    widget::{button, checkbox, column, container, pick_list, row, scrollable, text, text_input},
     Background, Border, Color, Element, Fill, Theme,
 };
 use serde_json::Value;
