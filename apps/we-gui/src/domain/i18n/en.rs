@@ -93,7 +93,7 @@ pub(super) fn text(key: Text) -> &'static str {
         Text::IntegrationRuntimeStatus => "Integration runtime status",
         Text::TrackPointerAcrossDesktop => "Track pointer across the desktop",
         Text::TrackPointerAcrossDesktopDescription => {
-            "On layer-shell, the next wallpaper start or switch asks you to choose one monitor through the system ScreenCast portal. The portal and compositor still produce a video stream; we-layerd reads only cursor metadata and does not map, read, or save image data."
+            "On layer-shell, the system ScreenCast portal asks you to choose one monitor the first time or after permission is revoked. The permission is then restored across wallpaper switches and restarts. The portal and compositor still produce a video stream; we-layerd reads only cursor metadata and does not map, read, or save image data."
         }
         Text::PortalAuthorization => "Portal authorization",
         Text::PortalAuthorizationDescription => {

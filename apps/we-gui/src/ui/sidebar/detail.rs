@@ -220,27 +220,6 @@ fn actions_view<'a>(
         .find(|option| option.value == settings.msaa_samples)
         .cloned()
         .or_else(|| msaa_options.first().cloned());
-    let msaa_control: Element<'a, DetailMessage> = if supports_final_output_msaa(wallpaper_type) {
-        container(
-            pick_list(msaa_options, selected_msaa, |option| {
-                DetailMessage::MsaaChanged(option.value)
-            })
-            .padding([14, 10])
-            .width(Fill)
-            .style(md_pick_list_style)
-            .menu_style(md_menu_style),
-        )
-        .id("detail.msaa")
-        .into()
-    } else {
-        container(
-            text(language.text(Text::MsaaSceneOnly))
-                .size(12)
-                .color(Color::from_rgb8(170, 174, 184)),
-        )
-        .padding([10, 0])
-        .into()
-    };
     let playback = section(
         language.text(Text::Playback),
         column![

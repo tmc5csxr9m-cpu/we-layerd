@@ -1,10 +1,15 @@
 use std::{
+    fs::{self, OpenOptions},
     future::Future,
-    io::Cursor,
+    io::{Cursor, Write},
     mem,
-    os::fd::OwnedFd,
+    os::{
+        fd::OwnedFd,
+        unix::fs::{OpenOptionsExt, PermissionsExt},
+    },
+    path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc, Arc,
     },
     thread::{self, JoinHandle},
@@ -30,6 +35,8 @@ const DRM_FORMAT_MOD_INVALID: i64 = 0x00ff_ffff_ffff_ffff;
 const CURSOR_BITMAP_DEFAULT_SIDE: usize = 384;
 const CURSOR_BITMAP_MAX_SIDE: usize = 1024;
 const CURSOR_BITMAP_BYTES_PER_PIXEL: usize = 4;
+const SCREENCAST_PERSISTENCE_VERSION: u32 = 4;
+static RESTORE_TOKEN_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug)]
 pub(super) enum GlobalPointerEvent {
@@ -45,14 +52,21 @@ pub(super) struct GlobalPointerTracker {
 }
 
 impl GlobalPointerTracker {
-    pub(super) fn start() -> std::io::Result<Self> {
+    pub(super) fn start(output_name: &str) -> std::io::Result<Self> {
         let (event_tx, events) = mpsc::channel();
         let (stop_tx, stop_rx) = watch::channel(false);
         let stop = Arc::new(AtomicBool::new(false));
         let worker_stop = Arc::clone(&stop);
-        let worker = thread::Builder::new()
-            .name("we-layerd-global-pointer".to_string())
-            .spawn(move || worker_main(event_tx, stop_rx, worker_stop))?;
+        let restore_token_path = match restore_token_path(output_name) {
+            Ok(path) => Some(path),
+            Err(error) => {
+                tracing::warn!(%error, "ScreenCast permission will not persist across restarts");
+                None
+            }
+        };
+        let worker = thread::Builder::new().name("we-layerd-global-pointer".to_string()).spawn(
+            move || worker_main(event_tx, stop_rx, worker_stop, restore_token_path.as_deref()),
+        )?;
 
         Ok(Self { events, stop_tx, stop, worker: Some(worker) })
     }
@@ -94,6 +108,7 @@ fn worker_main(
     event_tx: mpsc::Sender<GlobalPointerEvent>,
     stop_rx: watch::Receiver<bool>,
     stop: Arc<AtomicBool>,
+    restore_token_path: Option<&Path>,
 ) {
     let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
         Ok(runtime) => runtime,
@@ -103,7 +118,7 @@ fn worker_main(
         }
     };
 
-    let portal_stream = match runtime.block_on(open_portal(stop_rx)) {
+    let portal_stream = match runtime.block_on(open_portal(stop_rx, restore_token_path)) {
         Ok(PortalOpen::Ready(stream)) => stream,
         Ok(PortalOpen::Stopped) => return,
         Err(error) => {
@@ -121,7 +136,10 @@ fn worker_main(
     }
 }
 
-async fn open_portal(mut stop: watch::Receiver<bool>) -> Result<PortalOpen> {
+async fn open_portal(
+    mut stop: watch::Receiver<bool>,
+    restore_token_path: Option<&Path>,
+) -> Result<PortalOpen> {
     if *stop.borrow() {
         return Ok(PortalOpen::Stopped);
     }
@@ -158,19 +176,35 @@ async fn open_portal(mut stop: watch::Receiver<bool>) -> Result<PortalOpen> {
         ));
     }
 
+    let portal_version = portal.version();
+    let persistence_supported = portal_version >= SCREENCAST_PERSISTENCE_VERSION;
+    let restore_token = if persistence_supported {
+        restore_token_path.and_then(|path| match load_restore_token(path) {
+            Ok(token) => token,
+            Err(error) => {
+                tracing::warn!(path = %path.display(), %error, "failed to load ScreenCast restore token");
+                None
+            }
+        })
+    } else {
+        None
+    };
+
     let Some(session) = portal_step(&mut stop, portal.create_session(Default::default())).await?
     else {
         return Ok(PortalOpen::Stopped);
     };
 
-    let select = portal.select_sources(
-        &session,
-        SelectSourcesOptions::default()
-            .set_cursor_mode(CursorMode::Metadata)
-            .set_sources(Some(SourceType::Monitor.into()))
-            .set_multiple(false)
-            .set_persist_mode(PersistMode::DoNot),
-    );
+    let mut select_options = SelectSourcesOptions::default()
+        .set_cursor_mode(CursorMode::Metadata)
+        .set_sources(Some(SourceType::Monitor.into()))
+        .set_multiple(false);
+    if persistence_supported {
+        select_options = select_options
+            .set_persist_mode(PersistMode::ExplicitlyRevoked)
+            .set_restore_token(restore_token.as_deref());
+    }
+    let select = portal.select_sources(&session, select_options);
     let select_request = match portal_step(&mut stop, select).await {
         Ok(Some(request)) => request,
         Ok(None) => {
@@ -208,6 +242,21 @@ async fn open_portal(mut stop: watch::Receiver<bool>) -> Result<PortalOpen> {
                 .context("monitor selection was cancelled or denied by the ScreenCast portal");
         }
     };
+    if let Some(path) = restore_token_path.filter(|_| persistence_supported) {
+        match response.restore_token() {
+            Some(token) => {
+                if let Err(error) = store_restore_token(path, token) {
+                    tracing::warn!(path = %path.display(), %error, "failed to persist ScreenCast restore token");
+                }
+            }
+            None if restore_token.is_some() => {
+                if let Err(error) = remove_restore_token(path) {
+                    tracing::warn!(path = %path.display(), %error, "failed to remove stale ScreenCast restore token");
+                }
+            }
+            None => {}
+        }
+    }
     let Some(stream) = response.streams().first() else {
         let _ = session.close().await;
         return Err(anyhow!("the ScreenCast portal returned no selected monitor stream"));
@@ -233,11 +282,96 @@ async fn open_portal(mut stop: watch::Receiver<bool>) -> Result<PortalOpen> {
         };
 
     tracing::info!(
-        portal_version = portal.version(),
+        portal_version,
         pipewire_node_id = node_id,
+        restored = restore_token.is_some(),
+        persistent = response.restore_token().is_some(),
         "ScreenCast portal granted one monitor for cursor metadata"
     );
     Ok(PortalOpen::Ready(PortalStream { portal, session, node_id, fd }))
+}
+
+fn restore_token_path(output_name: &str) -> Result<PathBuf> {
+    let state_home = match std::env::var_os("XDG_STATE_HOME").filter(|value| !value.is_empty()) {
+        Some(path) => PathBuf::from(path),
+        None => {
+            let home = std::env::var_os("HOME")
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| anyhow!("HOME and XDG_STATE_HOME are unset"))?;
+            PathBuf::from(home).join(".local/state")
+        }
+    };
+    if !state_home.is_absolute() {
+        return Err(anyhow!("XDG state directory must be absolute"));
+    }
+    Ok(restore_token_path_in(&state_home, output_name))
+}
+
+fn restore_token_path_in(state_home: &Path, output_name: &str) -> PathBuf {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(output_name.len().saturating_mul(2));
+    for byte in output_name.as_bytes() {
+        encoded.push(HEX[(byte >> 4) as usize] as char);
+        encoded.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    if encoded.is_empty() {
+        encoded.push_str("default");
+    }
+    state_home.join("we-layerd/screencast").join(format!("{encoded}.restore-token"))
+}
+
+fn load_restore_token(path: &Path) -> Result<Option<String>> {
+    match fs::read_to_string(path) {
+        Ok(token) if token.is_empty() => Ok(None),
+        Ok(token) => Ok(Some(token)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).with_context(|| format!("failed to read {}", path.display())),
+    }
+}
+
+fn store_restore_token(path: &Path, token: &str) -> Result<()> {
+    if token.is_empty() {
+        return Err(anyhow!("portal returned an empty restore token"));
+    }
+    let parent = path.parent().ok_or_else(|| anyhow!("restore token path has no parent"))?;
+    fs::create_dir_all(parent).with_context(|| format!("failed to create {}", parent.display()))?;
+    fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+        .with_context(|| format!("failed to protect {}", parent.display()))?;
+
+    let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("restore-token");
+    let sequence = RESTORE_TOKEN_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let temporary =
+        path.with_file_name(format!(".{file_name}.{}.{}.tmp", std::process::id(), sequence));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&temporary)
+        .with_context(|| format!("failed to create {}", temporary.display()))?;
+    if let Err(error) = file.write_all(token.as_bytes()).and_then(|_| file.sync_all()) {
+        drop(file);
+        let _ = fs::remove_file(&temporary);
+        return Err(error).with_context(|| format!("failed to write {}", temporary.display()));
+    }
+    drop(file);
+    if let Err(error) = fs::rename(&temporary, path) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error).with_context(|| format!("failed to replace {}", path.display()));
+    }
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .with_context(|| format!("failed to protect {}", path.display()))?;
+    if let Ok(directory) = fs::File::open(parent) {
+        let _ = directory.sync_all();
+    }
+    Ok(())
+}
+
+fn remove_restore_token(path: &Path) -> Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).with_context(|| format!("failed to remove {}", path.display())),
+    }
 }
 
 async fn portal_step<T, F>(stop: &mut watch::Receiver<bool>, future: F) -> Result<Option<T>>
@@ -567,12 +701,65 @@ fn normalize_cursor_position(x: i32, y: i32, width: u32, height: u32) -> Option<
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_cursor_position;
+    use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf};
+
+    use super::{
+        load_restore_token, normalize_cursor_position, remove_restore_token, restore_token_path_in,
+        store_restore_token,
+    };
+
+    fn unique_state_home(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "we-layerd-{label}-{}-{}",
+            std::process::id(),
+            super::RESTORE_TOKEN_TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ))
+    }
 
     #[test]
     fn cursor_metadata_uses_the_negotiated_video_size() {
         assert_eq!(normalize_cursor_position(960, 540, 1920, 1080), Some((0.5, 0.5)));
         assert_eq!(normalize_cursor_position(-1, 1200, 1920, 1080), Some((0.0, 1.0)));
         assert_eq!(normalize_cursor_position(1, 1, 0, 1080), None);
+    }
+
+    #[test]
+    fn restore_token_paths_are_stable_and_output_scoped() {
+        let state_home = PathBuf::from("/tmp/we-layerd-state");
+        assert_eq!(
+            restore_token_path_in(&state_home, "DP-3"),
+            state_home.join("we-layerd/screencast/44502d33.restore-token")
+        );
+        assert_ne!(
+            restore_token_path_in(&state_home, "DP-3"),
+            restore_token_path_in(&state_home, "HDMI-A-1")
+        );
+    }
+
+    #[test]
+    fn restore_token_is_replaced_atomically_with_private_permissions() {
+        let state_home = unique_state_home("restore-token");
+        let path = restore_token_path_in(&state_home, "DP-3");
+
+        assert_eq!(load_restore_token(&path).expect("missing token"), None);
+        store_restore_token(&path, "first").expect("store first token");
+        store_restore_token(&path, "second").expect("replace token");
+        assert_eq!(load_restore_token(&path).expect("load token").as_deref(), Some("second"));
+        assert_eq!(
+            fs::metadata(path.parent().expect("token parent"))
+                .expect("parent metadata")
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(&path).expect("token metadata").permissions().mode() & 0o777,
+            0o600
+        );
+
+        remove_restore_token(&path).expect("remove token");
+        remove_restore_token(&path).expect("remove missing token");
+        fs::remove_dir_all(&state_home).expect("remove state fixture");
     }
 }

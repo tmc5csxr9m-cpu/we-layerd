@@ -91,7 +91,7 @@ pub(super) fn text(key: Text) -> &'static str {
         Text::IntegrationRuntimeStatus => "集成运行状态",
         Text::TrackPointerAcrossDesktop => "跟踪桌面鼠标指针",
         Text::TrackPointerAcrossDesktopDescription => {
-            "在 layer-shell 下，下次启动或切换壁纸时，系统 ScreenCast portal 会要求你选择一块显示器。Portal 和合成器仍会产生视频流；we-layerd 只读取指针元数据，不会映射、读取或保存图像数据。"
+            "在 layer-shell 下，首次使用或权限被撤销后，系统 ScreenCast portal 会要求你选择一块显示器；随后切换壁纸或重启时会自动恢复该权限。Portal 和合成器仍会产生视频流；we-layerd 只读取指针元数据，不会映射、读取或保存图像数据。"
         }
         Text::PortalAuthorization => "Portal 授权",
         Text::PortalAuthorizationDescription => {

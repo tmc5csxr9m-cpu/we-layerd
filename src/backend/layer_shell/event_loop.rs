@@ -526,7 +526,7 @@ pub(crate) fn run_output(ctx: BackendContext<'_>, target_output: &str) -> Result
         tracing::info!(
             "requesting one monitor through the ScreenCast portal for optional global pointer tracking"
         );
-        match GlobalPointerTracker::start() {
+        match GlobalPointerTracker::start(target_output) {
             Ok(tracker) => Some(tracker),
             Err(error) => {
                 let reason = format!("failed to start global pointer worker: {error}");
